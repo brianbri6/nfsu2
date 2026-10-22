@@ -22,7 +22,7 @@ std::string json(const std::string& value) {
 std::string probe(const char* hooks, const char* temp, const char* directory, const char* library) {
     struct Loader { void* handle; ~Loader() { if (handle) dlclose(handle); } }
         loader{nfsOpenVulkan(hooks, temp, directory, library)};
-    if (!loader.handle) return "{\"driverLoadFailed\":true,\"probeError\":\"No se pudo abrir el driver seleccionado\"}";
+    if (!loader.handle) return "{\"driverLoadFailed\":true,\"probeError\":\"Could not open selected driver\"}";
     auto getProc = nfsVulkanEntry(loader.handle);
     if (!getProc) return "{\"driverLoadFailed\":true,\"probeError\":\"El paquete no ofrece vkGetInstanceProcAddr\"}";
     auto createInstance = reinterpret_cast<PFN_vkCreateInstance>(getProc(nullptr, "vkCreateInstance"));
@@ -53,7 +53,7 @@ std::string probe(const char* hooks, const char* temp, const char* directory, co
     uint32_t count = 0;
     if (vkEnumeratePhysicalDevices(instance, &count, nullptr) != VK_SUCCESS || !count) {
         vkDestroyInstance(instance, nullptr);
-        return "{\"driverLoadFailed\":true,\"probeError\":\"No se encontró una GPU Vulkan\"}";
+        return "{\"driverLoadFailed\":true,\"probeError\":\"No Vulkan GPU was found\"}";
     }
     std::vector<VkPhysicalDevice> devices(count);
     vkEnumeratePhysicalDevices(instance, &count, devices.data());
