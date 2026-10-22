@@ -1,5 +1,17 @@
 # NFSU2 English APK localization — audit and continuation
 
+## Top-left startup diagnostic overlay fix — v0.14.12
+- Root cause: `GameActivity.setStatus()` only schedules the overlay dismissal on substring `Starting CRT entry point`, but the native worker reports `Ejecutando entrada CRT del juego…` (translated in the direct English APK to `Starting game CRT entry…`), so the condition is never true.
+- Source: updated `GameActivity.java` to match `Starting game CRT entry` and dismiss the transient diagnostic overlay after **5 seconds**, preserving the original persistent diagnostic behavior on genuine errors.
+- Source native worker: `guest_boot_worker.h` startup statuses translated to English to match the UI.
+- Direct APK: `scripts/patch_nfsu2_apk_english.py` modifies the original `GameActivity.smali` startup substring test and `postDelayed` constant from 8000 to 5000 milliseconds. It asserts both changes occurred exactly once; a mismatch fails publication.
+- Tests: two smali regression tests validate the matching literal, 5000-ms delay, and preservation of unrelated timers.
+- Gradle metadata: versionName 0.14.12 / versionCode 27; GitHub Actions builds both Android ABIs based on upstream v0.14.9.
+- Build run (initial): https://github.com/brianbri6/nfsu2/actions/runs/39766154795 — check run completion and release assets before declaring success.
+- Note: the top-left `PopupWindow` is an Android diagnostic/status overlay, not the gameplay HUD or touch controls. The fix should not disable error reporting or other overlays.
+- Device testing outstanding: startup on a phone plus forced startup error after the five-second timer to ensure the error remains visible. Re-signing via CI may require uninstall due to nonstable signer; back up saves first.
+
+
 ## Verified GitHub Actions run — 2026-10-22
 
 - Run: https://github.com/brianbri6/nfsu2/actions/runs/39727031835 — **SUCCESS**.
