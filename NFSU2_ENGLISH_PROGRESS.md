@@ -4,7 +4,7 @@
 Remove remaining Spanish from the Android interface and native diagnostics, patch **the upstream v0.14.9 APKs directly** (ARM64 and ARMv7), verify the result, and publish this fork's **v0.14.11 English** release. Original NFSU2 game data is not included.
 
 ## Findings confirmed from repository source
-The previous translation missed: `RacingControlsView.java` accessibility label "Controles del juego"; Vulkan probe error strings in `gpu_probe.cpp` ("El paquete no ofrece…" and "Driver con funciones Vulkan incompletas"); "HLE pendiente / desde" from `guest_runtime.cpp`; D3D9 failure text and CPU/GPU texture/log labels from `d3d9_bridge.cpp`.
+The previous translation missed: `RacingControlsView.java` accessibility label "Controles del juego"; Vulkan probe error strings in `gpu_probe.cpp` ("El paquete no ofrece…" and "Driver con funciones Vulkan incompletas"); "HLE pendiente / desde" from `guest_runtime.cpp`; D3D9 failure text and CPU/GPU texture/log labels from `d3d9_bridge.cpp`; and the user-visible `Descargas/NFSU2` report path in `Diagnostics.java`.
 
 An additional functional bug was found: the previous direct APK patch changed the default language only. Existing installs retained the `language=Spanish` preference. The English source now uses preference key `language_english_v01411` with default `English UK`; the direct smali patch migrates both GameOptions getter and the language-picker's generated callback. Other languages may still be manually selected. The `language` option forwarded to the native game runtime is intentionally unchanged.
 
@@ -15,9 +15,9 @@ An additional functional bug was found: the previous direct APK patch changed th
 - `localization/en-us.json`: UI and additional diagnostic translation source of truth.
 - `localization/native-en-us.json`: byte-length-checked compiled ELF string replacements.
 - `scripts/patch_nfsu2_apk_english.py`: direct APK patcher for smali, XML resources, and native ELF text. ELF replacements are NUL-padded to preserve offsets. Applies fork update/report links and language-default migration.
-- `scripts/audit_nfsu2_apk_english.py`: post-patch Spanish detector for DEX const strings, XML text and app-owned native libraries. Unknown Spanish text blocks publication.
+- `scripts/audit_nfsu2_apk_english.py`: post-patch Spanish detector for DEX const strings, XML text and app-owned native libraries. Unknown Spanish text blocks publication. Audits also scan layout XML attributes, app-owned text assets and Unicode-escaped strings.
 - `scripts/tests/test_apk_localization.py`: synthetic regression tests for migration, native byte sizes, smali patching and scan failures, plus source-literal audit.
-- `.github/workflows/nfsu2-english-apk-release.yml`: checks test suite, pins apktool checksum, patches *both original APKs*, writes audit JSON, bumps to v0.14.11 (versionCode 26), aligns, signs, verifies and publishes only when previous steps pass. Audit reports are uploaded as artifacts.
+- `.github/workflows/nfsu2-english-apk-release.yml`: runs regression tests, pins apktool checksum, captures **before and after** Spanish inventories, patches *both original APKs*, writes JSON audits, bumps to v0.14.11 (versionCode 26), aligns, signs, verifies and publishes only when previous steps pass. Audit reports are preserved as Actions artifacts and included with the release.
 - `android/app/build.gradle`: v0.14.11, versionCode 26.
 
 ## Verification done / not done
