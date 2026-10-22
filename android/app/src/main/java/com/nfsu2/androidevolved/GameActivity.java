@@ -250,8 +250,7 @@ public final class GameActivity extends NativeActivity {
             // Startup progress comes from GuestBootWorker, not the lifted CRT log.
             // The old "Starting CRT entry point" condition never matched the native
             // message, so the top-left diagnostic PopupWindow stayed forever.
-            if (message.contains("Starting game CRT entry") ||
-                    message.contains("Ejecutando entrada CRT del juego")) {
+            if (message.contains("Starting game CRT entry")) {
                 status.setText("NFSU2 Android Evolved\n" + message);
                 statusHideTask = () -> {statusHidden=true;if(statusWindow.isShowing())statusWindow.dismiss();};
                 status.postDelayed(statusHideTask, 5000);
