@@ -4,7 +4,12 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['.github/workflows/nfsu2-english-apk-release.yml']
+    paths:
+      - '.github/workflows/nfsu2-english-apk-release.yml'
+      - 'scripts/patch_nfsu2_apk_english.py'
+      - 'scripts/audit_nfsu2_apk_english.py'
+      - 'scripts/tests/**'
+      - 'localization/**'
 permissions:
   contents: write
 jobs:
@@ -12,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      VERSION: '0.14.10'
+      VERSION: '0.14.11'
       UPSTREAM_VERSION: '0.14.9'
     steps:
       - uses: actions/checkout@v4
@@ -25,9 +30,12 @@ jobs:
         run: |
           set -euo pipefail
           curl -fL --retry 3 -o apktool.jar https://github.com/iBotPeaches/Apktool/releases/download/v2.12.1/apktool_2.12.1.jar
+          echo "66cf4524a4a45a7f56567d08b2c9b6ec237bcdd78cee69fd4a59c8a0243aeafa  apktool.jar" | sha256sum --check
           java -jar apktool.jar --version
-          python3 -m py_compile scripts/patch_nfsu2_apk_english.py
+          python3 -m py_compile scripts/patch_nfsu2_apk_english.py scripts/audit_nfsu2_apk_english.py
           python3 -m json.tool localization/en-us.json >/dev/null
+          python3 -m json.tool localization/native-en-us.json >/dev/null
+          python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
       - name: Prepare APK signing key
         shell: bash
         env:
@@ -65,13 +73,14 @@ jobs:
             test "$(stat -c%s "$filename")" -gt 1000000
             sha256sum "$filename"
             java -jar apktool.jar d -f "$filename" -o "decoded-$abi"
-            python3 scripts/patch_nfsu2_apk_english.py "decoded-$abi" --translations localization/en-us.json
+            python3 scripts/patch_nfsu2_apk_english.py "decoded-$abi"               --translations localization/en-us.json               --native-translations localization/native-en-us.json               --audit-report "output/audit-$abi.json"
+            python3 scripts/audit_nfsu2_apk_english.py "decoded-$abi" --report "output/verified-$abi.json"
             python3 - "decoded-$abi/apktool.yml" <<'PY'
           import pathlib, re, sys
           p = pathlib.Path(sys.argv[1])
           s = p.read_text()
-          s, c = re.subn(r"(?m)^  versionCode:.*$", "  versionCode: '25'", s, count=1)
-          s, n = re.subn(r"(?m)^  versionName:.*$", "  versionName: 0.14.10", s, count=1)
+          s, c = re.subn(r"(?m)^  versionCode:.*$", "  versionCode: '26'", s, count=1)
+          s, n = re.subn(r"(?m)^  versionName:.*$", "  versionName: 0.14.11", s, count=1)
           assert c == n == 1, "Version metadata missing"
           p.write_text(s)
           PY
@@ -84,7 +93,16 @@ jobs:
             sha256sum "$outfile"
           done
           (cd output && sha256sum NFSU2-AndroidEvolved-*-English-*.apk > SHA256SUMS.txt)
-      - name: Publish v0.14.10 English release
+      - name: Preserve APK translation audits
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nfsu2-english-localization-audits
+          path: |
+            output/audit-*.json
+            output/verified-*.json
+          if-no-files-found: warn
+      - name: Publish v0.14.11 English release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -93,15 +111,15 @@ jobs:
           cat > release-notes.md <<'EOF'
           English user-interface patch based on the **original upstream v0.14.9 APKs**, modified directly with apktool and smali; the native game was not rebuilt.
 
-          Translated launcher, options, driver testing, reports, and touch-control editor. English is the default game language selection when the corresponding game language file is supplied. Original game files are not included.
+          Audited English launcher, options, driver testing, reports, touch-control editor, accessibility labels and native errors. Automated post-patch scan blocks releases with detected Spanish. English is the default game language selection when the corresponding game language file is supplied. Original game files are not included.
 
           **IMPORTANT:** The upstream private signing key is unavailable. These APKs use another key, so back up your game saves and uninstall the original APK before installing. Without configured NFSU2_SIGNING_* repository secrets, each workflow run signs with a new key and updates between runs will also require reinstallation.
 
           Includes ARM64 and 32-bit ARM APKs. Original source APKs: https://github.com/codepdbh/nfsu2-recompiled/releases/tag/v0.14.9
           EOF
           if gh release view "v$VERSION" >/dev/null 2>&1; then
-            gh release upload "v$VERSION" output/NFSU2-AndroidEvolved-*-English-*.apk output/SHA256SUMS.txt --clobber
+            gh release upload "v$VERSION" output/NFSU2-AndroidEvolved-*-English-*.apk output/SHA256SUMS.txt output/audit-*.json --clobber
           else
-            gh release create "v$VERSION" output/NFSU2-AndroidEvolved-*-English-*.apk output/SHA256SUMS.txt \
+            gh release create "v$VERSION" output/NFSU2-AndroidEvolved-*-English-*.apk output/SHA256SUMS.txt output/audit-*.json \
               --title "NFSU2 Android Evolved v$VERSION - English" --notes-file release-notes.md --target "$GITHUB_SHA" --latest
           fi
