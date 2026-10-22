@@ -35,7 +35,7 @@ def patch_smali(contents: str, filename: str, translations: dict[str, str],
         # Source dictionaries contain literal UTF-8 characters. Normalize only
         # Unicode escapes, preserving smali's \\n and escaped quote syntax.
         normalized = re.sub(
-            r"\\\\u([0-9a-fA-F]{4})",
+            r"\\u([0-9a-fA-F]{4})",
             lambda x: chr(int(x.group(1), 16)), old
         )
         new = normalized.replace(UPSTREAM, FORK)
