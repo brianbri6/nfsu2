@@ -12,5 +12,6 @@
   "Sincronía CPU/GPU": "CPU/GPU sync",
   "Texturas comprimidas: convertir en CPU": "Compressed textures: CPU conversion",
   "La GPU no pudo crear el dispositivo grafico (Vulkan, CreateDevice ": "GPU graphics device failed (Vulkan, CreateDevice ",
-  "). Usa \"Probar driver\" en el launcher para ver que le falta.": "). Use \"Test driver\" in the launcher for details."
+  "). Usa \"Probar driver\" en el launcher para ver que le falta.": "). Use \"Test driver\" in the launcher for details.",
+  "Ejecutando entrada CRT del juego…": "Starting game CRT entry…"
 }
