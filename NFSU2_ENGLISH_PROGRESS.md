@@ -7,7 +7,10 @@
 - Direct APK: `scripts/patch_nfsu2_apk_english.py` modifies the original `GameActivity.smali` startup substring test and `postDelayed` constant from 8000 to 5000 milliseconds. It asserts both changes occurred exactly once; a mismatch fails publication.
 - Tests: two smali regression tests validate the matching literal, 5000-ms delay, and preservation of unrelated timers.
 - Gradle metadata: versionName 0.14.12 / versionCode 27; GitHub Actions builds both Android ABIs based on upstream v0.14.9.
-- Build run (initial): https://github.com/brianbri6/nfsu2/actions/runs/39766154795 — check run completion and release assets before declaring success.
+- **Build verified:** https://github.com/brianbri6/nfsu2/actions/runs/39766154795 — SUCCESS on both ABIs. Tests passed; smali overlay trigger count **1** and 5-second timeout patch count **1** for each APK; post-patch Spanish audit reports **0** findings; APKs were assembled, zipaligned and verified with APK Signature Scheme v3.
+- **Release uploaded:** https://github.com/brianbri6/nfsu2/releases/tag/v0.14.12.
+- Published ARM64 APK SHA-256: `fa35d13f5ef47a05e7ac51a2cc6685bb09adbffc8af284850ca256eca25c14dc`
+- Published ARMv7 APK SHA-256: `c7d1f4a52951780a681ad8dead5fa97ae99ce4dae1666e9881e5d6899e41f4ba`
 - Note: the top-left `PopupWindow` is an Android diagnostic/status overlay, not the gameplay HUD or touch controls. The fix should not disable error reporting or other overlays.
 - Device testing outstanding: startup on a phone plus forced startup error after the five-second timer to ensure the error remains visible. Re-signing via CI may require uninstall due to nonstable signer; back up saves first.
 
