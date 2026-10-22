@@ -64,7 +64,7 @@ def patch_smali(contents: str, filename: str, translations: dict[str, str],
                     lambda x: x.group(1) + '"' + LANGUAGE_KEY + '"', method
                 )
                 stats["preference_getters"] += n
-            if filename == "LauncherActivity.smali" and "chooseLanguage(" in header:
+            if filename == "LauncherActivity.smali" and ("chooseLanguage(" in header or "lambda$chooseLanguage$" in header):
                 method, n = re.subn(
                     r'(?m)(^\s*const-string(?:/jumbo)?\s+[vp]\d+,\s+)"language"',
                     lambda x: x.group(1) + '"' + LANGUAGE_KEY + '"', method
