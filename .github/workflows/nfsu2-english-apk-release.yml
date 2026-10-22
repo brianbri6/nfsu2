@@ -1,0 +1,104 @@
+name: NFSU2 English APK Release
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/nfsu2-english-apk-release.yml']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      VERSION: '0.14.10'
+      UPSTREAM_VERSION: '0.14.9'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Obtain apktool
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o apktool.jar https://github.com/iBotPeaches/Apktool/releases/download/v2.12.1/apktool_2.12.1.jar
+          java -jar apktool.jar --version
+      - name: Prepare APK signing key
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.NFSU2_SIGNING_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.NFSU2_SIGNING_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.NFSU2_SIGNING_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.NFSU2_SIGNING_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$KEYSTORE_BASE64" ]]; then
+            test -n "$STORE_PASSWORD"
+            test -n "$KEY_PASSWORD"
+            test -n "$KEY_ALIAS"
+            printf '%s' "$KEYSTORE_BASE64" | base64 -d > nfsu2-signing.jks
+          else
+            keytool -genkeypair -noprompt -keystore nfsu2-signing.jks -storepass android -keypass android -alias english \
+              -keyalg RSA -keysize 3072 -validity 3650 -dname "CN=NFSU2 English Patch"
+            STORE_PASSWORD=android
+            KEY_PASSWORD=android
+            KEY_ALIAS=english
+            echo "::warning::APK is signed with an ephemeral key and cannot update an upstream-installed APK."
+          fi
+          echo "STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+      - name: Directly patch original APKs and verify signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          for abi in arm64 armeabi-v7a; do
+            filename="NFSU2-AndroidEvolved-v$UPSTREAM_VERSION-$abi.apk"
+            curl -fL --retry 3 -o "$filename" "https://github.com/codepdbh/nfsu2-recompiled/releases/download/v$UPSTREAM_VERSION/$filename"
+            test "$(stat -c%s "$filename")" -gt 1000000
+            sha256sum "$filename"
+            java -jar apktool.jar d -f -r "$filename" -o "decoded-$abi"
+            python3 scripts/patch_nfsu2_apk_english.py "decoded-$abi" --translations localization/en-us.json
+            python3 - "decoded-$abi/apktool.yml" <<'PY'
+          import pathlib, re, sys
+          p = pathlib.Path(sys.argv[1])
+          s = p.read_text()
+          s, c = re.subn(r"(?m)^  versionCode:.*$", "  versionCode: '25'", s, count=1)
+          s, n = re.subn(r"(?m)^  versionName:.*$", "  versionName: 0.14.10", s, count=1)
+          assert c == n == 1, "Version metadata missing"
+          p.write_text(s)
+          PY
+            java -jar apktool.jar b "decoded-$abi" -o "output/unsigned-$abi.apk"
+            "$BUILD_TOOLS/zipalign" -P 16 -f 4 "output/unsigned-$abi.apk" "output/aligned-$abi.apk"
+            outfile="output/NFSU2-AndroidEvolved-v$VERSION-English-$abi.apk"
+            "$BUILD_TOOLS/apksigner" sign --ks nfsu2-signing.jks --ks-pass "pass:$STORE_PASSWORD" \
+              --ks-key-alias "$KEY_ALIAS" --key-pass "pass:$KEY_PASSWORD" --out "$outfile" "output/aligned-$abi.apk"
+            "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$outfile"
+            sha256sum "$outfile"
+          done
+          (cd output && sha256sum NFSU2-AndroidEvolved-*-English-*.apk > SHA256SUMS.txt)
+      - name: Publish v0.14.10 English release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > release-notes.md <<'EOF'
+          English user-interface patch based on the **original upstream v0.14.9 APKs**, modified directly with apktool and smali; the native game was not rebuilt.
+
+          Translated launcher, options, driver testing, reports, and touch-control editor. English is the default game language selection when the corresponding game language file is supplied. Original game files are not included.
+
+          **IMPORTANT:** The upstream private signing key is unavailable. These APKs use another key, so back up your game saves and uninstall the original APK before installing. Without configured NFSU2_SIGNING_* repository secrets, each workflow run signs with a new key and updates between runs will also require reinstallation.
+
+          Includes ARM64 and 32-bit ARM APKs. Original source APKs: https://github.com/codepdbh/nfsu2-recompiled/releases/tag/v0.14.9
+          EOF
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            gh release upload "v$VERSION" output/NFSU2-AndroidEvolved-*-English-*.apk output/SHA256SUMS.txt --clobber
+          else
+            gh release create "v$VERSION" output/NFSU2-AndroidEvolved-*-English-*.apk output/SHA256SUMS.txt \
+              --title "NFSU2 Android Evolved v$VERSION - English" --notes-file release-notes.md --target "$GITHUB_SHA" --latest
+          fi
