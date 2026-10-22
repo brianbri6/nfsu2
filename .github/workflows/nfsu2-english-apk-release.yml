@@ -1,4 +1,5 @@
 name: NFSU2 English APK Release
+# Localized source and binary patches maintained in this fork; base APK v0.14.9.
 on:
   workflow_dispatch:
   push:
