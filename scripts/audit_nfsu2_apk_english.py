@@ -32,6 +32,12 @@ SPANISH = re.compile(
     r"conducci[oó]n por inclinaci[oó]n)\b|[¿¡])",
     re.IGNORECASE,
 )
+NATIVE_SPANISH = re.compile(
+    r"\b(?:no se|el paquete|el juego|del juego|driver con|"
+    r"hle pendiente|desde el|ejecutando entrada|"
+    r"la gpu|usa .*probar driver|el sistema|"
+    r"datos accesibles|presentaci[oó]n activa)\b", re.IGNORECASE
+)
 ACCENTED_SPANISH = re.compile(r"(?:[áéíóúñÁÉÍÓÚÑ])")
 COMMON_UI = re.compile(
     r"\b(?:jugar|guardar|guardado|cancelar|aceptar|volver|importar|eliminar|"
@@ -102,7 +108,7 @@ def audit(root: Path) -> list[dict[str, str | int]]:
             # Machine instructions can contain arbitrary non-ASCII bytes that
             # look like accents. Only report recognizable multiword Spanish
             # phrases from native binaries, never isolated accented bytes.
-            if value in seen or not SPANISH.search(value):
+            if value in seen or not NATIVE_SPANISH.search(value):
                 continue
             seen.add(value)
             findings.append({"surface": "native", "file": str(path.relative_to(root)),
