@@ -1,5 +1,20 @@
 # NFSU2 English APK localization — audit and continuation
 
+## Verified GitHub Actions run — 2026-10-22
+
+- Run: https://github.com/brianbri6/nfsu2/actions/runs/39727031835 — **SUCCESS**.
+- Latest release: https://github.com/brianbri6/nfsu2/releases/tag/v0.14.11 (both ARM64 and armeabi-v7a APKs uploaded).
+- Fixed previously broken smali Unicode-escape matching (the regex looked for double backslashes, but apktool used single backslashes). This was the main reason Spanish menu labels remained.
+- Fixed false-positive Spanish detection caused by treating arbitrary ELF machine-code bytes as UTF-8 text.
+- Translated all remaining known Android app and driver archive prompts, including mixed Spanish-English text in touch layout dialogs.
+- Fixed native string replacements to space-pad rather than NUL-pad substrings embedded in JSON messages; NUL would truncate the diagnostics.
+- Actual APK jobs (both ABI variants): 245 smali replacements, 17 native replacements, English language default verified and preference setter migration verified, **0 untranslated Spanish findings reported** in the patch audit.
+- Both signed with APK Signature Scheme v3; signing and zipalign checks completed. The workflow uses an ephemeral signing key unless stable NFSU2_SIGNING_* secrets are configured, so upgrade compatibility is **not guaranteed**.
+- ARM64 APK SHA-256: `79ba6929005fa4a7247750c3a2c1ce474422d194425c1fc85f73e36640a0f402`
+- ARMv7 APK SHA-256: `d855e152c020818b0268e0a0fdaf7f9465980b12852a4923e872be6a81946a55`
+- Not yet verified on a physical Android device: visual inspection of every launcher/overlay dialog and in-game content. The original PC game's language files are outside the APK; for English game menus the user must supply `LANGUAGES/English.bin`.
+
+
 ## Current goal
 Remove remaining Spanish from the Android interface and native diagnostics, patch **the upstream v0.14.9 APKs directly** (ARM64 and ARMv7), verify the result, and publish this fork's **v0.14.11 English** release. Original NFSU2 game data is not included.
 
@@ -23,7 +38,7 @@ An additional functional bug was found: the previous direct APK patch changed th
 ## Verification done / not done
 **Verified:** GitHub connector returned successful commits for all updated source/scripts/workflow files; file contents were refetched after update, including new v0.14.11 metadata.
 
-**NOT verified:** No actual upstream APK binary was successfully retrieved into this chat's working container; direct smali/ELF patching and running on a phone are not tested here. The GitHub Actions pipeline is configured to perform those checks, but its completion and an uploaded APK release have **not** been confirmed. Do not claim a release asset exists until the Actions run succeeds.
+**APK packaging now verified through GitHub Actions** (see successful run above). No local on-device visual test has been performed here.
 
 **Potential blockers:** A future APK may introduce unexpected user-facing strings, changed smali method structure, or incompatible resources. The strict audit or preference migration assertion intentionally fails the job rather than silently publishing an incomplete translation. Inspect the job's audit artifact and logs if it fails. The source/game runtime is not rebuilt by the APK workflow.
 
