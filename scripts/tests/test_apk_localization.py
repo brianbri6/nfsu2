@@ -17,8 +17,48 @@ class EnglishPatchTests(unittest.TestCase):
     def stat(self):
         return {k: 0 for k in (
             "smali_strings", "preference_fields", "english_defaults",
-            "preference_getters", "preference_setters"
+            "preference_getters", "preference_setters", "overlay_startup_triggers", "overlay_timeout_patches"
         )}
+
+    def test_startup_diagnostic_popup_uses_real_native_status_and_five_seconds(self):
+        smali = '''
+.method private synthetic lambda$setStatus$9(Ljava/lang/String;)V
+    .locals 7
+    const-string v1, "Starting CRT entry point"
+    invoke-virtual {p1, v1}, Ljava/lang/String;->contains(Ljava/lang/CharSequence;)Z
+    const-wide/16 v2, 0x1f40
+    invoke-virtual {v0, v1, v2, v3}, Landroid/widget/TextView;->postDelayed(Ljava/lang/Runnable;J)Z
+.end method
+.method public setStatus(Ljava/lang/String;)V
+    .locals 2
+    return-void
+.end method
+'''
+        stats = self.stat()
+        result = patch_smali(smali, "GameActivity.smali", {}, stats, set())
+        self.assertIn('"Starting game CRT entry"', result)
+        self.assertNotIn('"Starting CRT entry point"', result)
+        self.assertIn('const-wide/16 v2, 0x1388', result)
+        self.assertEqual(stats["overlay_startup_triggers"], 1)
+        self.assertEqual(stats["overlay_timeout_patches"], 1)
+        self.assertIn("postDelayed", result)
+
+    def test_startup_popup_preserves_other_timeout_paths(self):
+        smali = '''
+.method private a()V
+    .locals 2
+    const-string v0, "Starting CRT entry point"
+    const-wide/16 v0, 0x1f40
+.end method
+.method private b()V
+    .locals 2
+    const-wide/16 v0, 0x1f40
+.end method
+'''
+        stats = self.stat()
+        result = patch_smali(smali, "GameActivity.smali", {}, stats, set())
+        self.assertIn(".method private b()V\n    .locals 2\n    const-wide/16 v0, 0x1f40", result)
+        self.assertEqual(stats["overlay_timeout_patches"], 1)
 
     def test_game_language_pref_default_and_legacy_key(self):
         smali = '''
