@@ -56,6 +56,32 @@ def patch_smali(contents: str, filename: str, translations: dict[str, str],
         )
         stats["preference_fields"] += n
 
+    if filename == "GameActivity.smali":
+        # Native guest boot reports "Starting game CRT entry…" in the English
+        # binary, but the original Java overlay checks "Starting CRT entry
+        # point". That branch never runs, leaving the top-left PopupWindow up.
+        # Patch the original APK directly: don't depend on recompiling Java.
+        contents, n = re.subn(
+            r'(?m)(^\s*const-string(?:/jumbo)?\s+[vp]\d+,\s+)"Starting CRT entry point"',
+            lambda m: m.group(1) + '"Starting game CRT entry"', contents
+        )
+        stats["overlay_startup_triggers"] += n
+
+        def shorten_overlay_timeout(m: re.Match[str]) -> str:
+            method = m.group()
+            if '"Starting game CRT entry"' not in method:
+                return method
+            # Within the startup-status callback, postDelayed() gets 8000ms.
+            # Keep fatal/error messages in the original persistent else branch.
+            method, count = re.subn(
+                r'(?m)(^\s*const-wide/16\s+[vp]\d+,\s+)0x1f40\b',
+                lambda z: z.group(1) + '0x1388', method
+            )
+            stats["overlay_timeout_patches"] += count
+            return method
+
+        contents = METHOD.sub(shorten_overlay_timeout, contents)
+
     if filename in {"GameOptions.smali", "LauncherActivity.smali"}:
         def migrate(m: re.Match[str]) -> str:
             method = m.group()
@@ -118,7 +144,8 @@ def main() -> int:
     stats = {k: 0 for k in (
         "smali_files", "smali_strings", "xml_files", "asset_files", "native_files",
         "native_strings", "preference_fields", "preference_getters",
-        "preference_setters", "english_defaults")}
+        "preference_setters", "english_defaults", "overlay_startup_triggers",
+        "overlay_timeout_patches")}
     matched_ui: set[str] = set()
     matched_native: set[str] = set()
     for path in sorted(root.glob("smali*/**/*.smali")):
@@ -196,6 +223,10 @@ def main() -> int:
         problems.append("GameOptions English default was not patched exactly once")
     if not stats["preference_getters"] or not stats["preference_setters"]:
         problems.append("Old saved Spanish language preference still in use")
+    if stats["overlay_startup_triggers"] != 1:
+        problems.append("Top-left startup overlay trigger not patched exactly once")
+    if stats["overlay_timeout_patches"] != 1:
+        problems.append("Top-left overlay 5-second auto-dismiss timeout not patched exactly once")
     if findings:
         problems.append("Spanish app-owned strings remain (see audit report)")
     if problems:
