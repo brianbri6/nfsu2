@@ -57,8 +57,37 @@ def main():
             smali.write_text(updated, encoding="utf-8")
             changed += 1
 
+
+    # Selected messages are emitted by the native launcher/Vulkan diagnostic libraries.
+    # In-place byte replacement preserves ELF offsets and never touches game code.
+    native_translations = [
+        ("No se pudo abrir el driver seleccionado", "Could not open selected driver"),
+        ("No se encontró una GPU Vulkan", "No Vulkan GPU was found"),
+        ("No se pudo cargar el driver Vulkan ", "Could not load Vulkan driver "),
+        (". Elige el driver del sistema en el launcher.", ". Select the system driver in the launcher."),
+        ("Datos accesibles: memoria interna/nfsu2\nVulkan 1.1: presentación activa\n",
+         "Game files: internal storage/nfsu2\nVulkan 1.1: active display\n"),
+    ]
+    native_files_changed = 0
+    native_messages_changed = 0
+    for library in args.decoded_apk.glob("lib/**/*.so"):
+        data = library.read_bytes()
+        updated = data
+        for source, target in native_translations:
+            src, dst = source.encode("utf-8"), target.encode("utf-8")
+            assert len(dst) <= len(src), "Native replacement exceeds original length"
+            count = updated.count(src)
+            if count:
+                updated = updated.replace(src, dst + b" " * (len(src) - len(dst)))
+                native_messages_changed += count
+        if updated != data:
+            library.write_bytes(updated)
+            native_files_changed += 1
+
     print(json.dumps({
         "smali_files_changed": changed,
+        "native_files_changed": native_files_changed,
+        "native_messages_changed": native_messages_changed,
         "translated_const_strings": matches,
         "translation_keys_matched": len(matched_keys),
         "game_language_defaults_changed": language_defaults,
