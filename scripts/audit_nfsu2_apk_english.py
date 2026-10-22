@@ -32,10 +32,18 @@ SPANISH = re.compile(
     re.IGNORECASE,
 )
 ACCENTED_SPANISH = re.compile(r"(?:[áéíóúñÁÉÍÓÚÑ])")
+COMMON_UI = re.compile(
+    r"\b(?:jugar|guardar|guardado|cancelar|aceptar|volver|importar|eliminar|"
+    r"restaurar|aplicar|reiniciar|reintentar|carpetas|seleccionar|"
+    r"actualizar|novedades|idioma|conducci[oó]n|opciones|sistema|"
+    r"falta[n]?|cargando|comprobando|reemplazar|escribir|sensibilidad|"
+    r"minimapa|servidor online|captura de pantalla)\b", re.IGNORECASE
+)
 
 
 def suspect(s: str) -> bool:
-    if SPANISH.search(s):
+    s = re.sub(r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), s)
+    if SPANISH.search(s) or COMMON_UI.search(s):
         return True
     # Accents in non-English Latin strings usually indicate untranslated UI.
     # Avoid matching French/Danish/Japanese labels left in language identifiers.
@@ -56,10 +64,11 @@ def audit(root: Path) -> list[dict[str, str | int]]:
             if suspect(value):
                 findings.append({"surface": "smali", "file": str(path.relative_to(root)),
                                  "line": text.count("\n", 0, m.start()) + 1, "text": value[:240]})
-    for path in sorted(root.glob("res/values*/*.xml")):
+    for path in sorted(root.glob("res/**/*.xml")):
         try:
             tree = ElementTree.parse(path)
-            strings = [node.text or "" for node in tree.iter()]
+            strings = [(node.text or "") for node in tree.iter()]
+            strings += [val for node in tree.iter() for val in node.attrib.values()]
         except ElementTree.ParseError as error:
             findings.append({"surface": "xml", "file": str(path.relative_to(root)),
                              "line": 0, "text": f"Malformed XML: {error}"})
@@ -68,6 +77,22 @@ def audit(root: Path) -> list[dict[str, str | int]]:
             if suspect(value):
                 findings.append({"surface": "xml", "file": str(path.relative_to(root)),
                                  "line": 0, "text": value[:240]})
+    # Some APKs package help, menus, or presets as plain-text assets.
+    assets_dir = root / "assets"
+    if assets_dir.is_dir():
+        for path in sorted(assets_dir.rglob("*")):
+            if not path.is_file() or path.suffix.lower() not in {
+                ".txt", ".json", ".xml", ".html", ".htm", ".md", ".properties"
+            }:
+                continue
+            try:
+                raw = path.read_text(encoding="utf-8")
+            except (UnicodeError, OSError):
+                continue
+            for line_no, line in enumerate(raw.splitlines(), 1):
+                if suspect(line):
+                    findings.append({"surface": "asset", "file": str(path.relative_to(root)),
+                                     "line": line_no, "text": line[:240]})
     for path in sorted(root.glob("lib/**/libnfsu2*.so")):
         binary = path.read_bytes()
         seen: set[str] = set()
