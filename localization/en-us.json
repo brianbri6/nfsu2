@@ -203,5 +203,7 @@
   "El paquete de driver es demasiado grande.": "The driver package is too large.",
   "El driver debe ser una biblioteca Android ARM64 (.so), no de PC ni de 32 bits.": "Driver must be an Android ARM64 (.so) library, not a PC or 32-bit library.",
   "Enlace inesperado en el paquete.": "Unexpected symbolic link in package.",
-  "No se pudo eliminar ": "Could not delete "
+  "No se pudo eliminar ": "Could not delete ",
+  "Reset caché gráfica": "Reset graphics cache",
+  "Save diseño de ": "Save "
 }
