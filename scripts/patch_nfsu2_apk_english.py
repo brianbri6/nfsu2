@@ -31,7 +31,7 @@ def main():
     for smali in args.decoded_apk.glob("smali*/**/*.smali"):
         original = smali.read_text(encoding="utf-8")
         def translate(m):
-            global matches
+            nonlocal matches
             value = m.group("value")
             replacement = value.replace(UPSTREAM, FORK)
             for source, target in ordered:
@@ -44,7 +44,7 @@ def main():
         updated = CONST_STRING.sub(translate, original)
         if smali.name == "GameOptions.smali":
             def set_default(method):
-                global language_defaults
+                nonlocal language_defaults
                 first, last = method.group(1), method.group(2)
                 new, n = re.subn(
                     r'(?m)(^\s*const-string(?:/jumbo)?\s+[vp]\d+,\s+)"Spanish"',
