@@ -195,5 +195,6 @@
   "Driver con funciones Vulkan incompletas": "Driver is missing required Vulkan functions",
   "La GPU no pudo crear el dispositivo grafico (Vulkan, CreateDevice ": "The GPU could not create a graphics device (Vulkan, CreateDevice ",
   "HLE pendiente: ": "Unimplemented HLE: ",
-  "Texturas comprimidas: convertir en CPU": "Compressed textures: convert on CPU"
+  "Texturas comprimidas: convertir en CPU": "Compressed textures: convert on CPU",
+  "Descargas/NFSU2/": "Downloads/NFSU2/"
 }
