@@ -74,7 +74,7 @@ class EnglishPatchTests(unittest.TestCase):
         result, count = patch_native(data, {old: target}, set())
         self.assertEqual(len(data), len(result))
         self.assertEqual(count, 1)
-        self.assertIn(target.encode() + b'\x00', result)
+        self.assertIn(target.encode() + b' ' * (len(old.encode()) - len(target.encode())) + b'\x00', result)
         self.assertNotIn(old.encode(), result)
 
     def test_auditor_catches_untranslated_smali_xml_native(self):
