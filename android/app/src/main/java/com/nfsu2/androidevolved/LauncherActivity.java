@@ -390,8 +390,8 @@ public final class LauncherActivity extends Activity {
             updates.edit().putString("notified_tag", result.tag).apply();
             new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                     .setTitle("New version available: " + result.tag)
-                    .setMessage("You can download it from GitHub or keep playing this version. Install the APK over "
-                            + "the existing app to keep your saves and settings.")
+                    .setMessage("You can download it from GitHub or keep playing this version. Read the release notes "
+                            + "before replacing the APK to protect your saves and settings.")
                     .setPositiveButton("Update", (dialog, which) -> openUrl(Uri.parse(result.url)))
                     .setNegativeButton("Later", null).show();
         });
