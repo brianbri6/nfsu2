@@ -9,6 +9,8 @@ on:
       - 'scripts/patch_nfsu2_apk_english.py'
       - 'scripts/audit_nfsu2_apk_english.py'
       - 'scripts/tests/**'
+      - 'android/app/src/main/java/com/nfsu2/androidevolved/GameActivity.java'
+      - 'android/app/src/main/cpp/guest_boot_worker.h'
       - 'localization/**'
 concurrency:
   group: nfsu2-english-apk-release
@@ -20,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      VERSION: '0.14.11'
+      VERSION: '0.14.12'
       UPSTREAM_VERSION: '0.14.9'
     steps:
       - uses: actions/checkout@v4
@@ -84,8 +86,8 @@ jobs:
           import pathlib, re, sys
           p = pathlib.Path(sys.argv[1])
           s = p.read_text()
-          s, c = re.subn(r"(?m)^  versionCode:.*$", "  versionCode: '26'", s, count=1)
-          s, n = re.subn(r"(?m)^  versionName:.*$", "  versionName: 0.14.11", s, count=1)
+          s, c = re.subn(r"(?m)^  versionCode:.*$", "  versionCode: '27'", s, count=1)
+          s, n = re.subn(r"(?m)^  versionName:.*$", "  versionName: 0.14.12", s, count=1)
           assert c == n == 1, "Version metadata missing"
           p.write_text(s)
           PY
@@ -110,7 +112,7 @@ jobs:
             output/audit-*.json
             output/verified-*.json
           if-no-files-found: warn
-      - name: Publish v0.14.11 English release
+      - name: Publish v0.14.12 English release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -119,7 +121,7 @@ jobs:
           cat > release-notes.md <<'EOF'
           English user-interface patch based on the **original upstream v0.14.9 APKs**, modified directly with apktool and smali; the native game was not rebuilt.
 
-          Audited English launcher, options, driver testing, reports, touch-control editor, accessibility labels and native errors. Automated post-patch scan blocks releases with detected Spanish. English is the default game language selection when the corresponding game language file is supplied. Original game files are not included.
+          Fixed the persistent top-left startup/status popup: it now disappears five seconds after guest CRT startup while later errors still display. Audited English launcher, options, driver testing, reports, touch-control editor, accessibility labels and native errors. Automated post-patch scan blocks releases with detected Spanish. English is the default game language selection when the corresponding game language file is supplied. Original game files are not included.
 
           **IMPORTANT:** The upstream private signing key is unavailable. These APKs use another key, so back up your game saves and uninstall the original APK before installing. Without configured NFSU2_SIGNING_* repository secrets, each workflow run signs with a new key and updates between runs will also require reinstallation.
 
