@@ -109,7 +109,7 @@ def main() -> int:
     ui = json.loads(args.translations.read_text(encoding="utf-8"))
     native = json.loads(args.native_translations.read_text(encoding="utf-8"))
     stats = {k: 0 for k in (
-        "smali_files", "smali_strings", "xml_files", "native_files",
+        "smali_files", "smali_strings", "xml_files", "asset_files", "native_files",
         "native_strings", "preference_fields", "preference_getters",
         "preference_setters", "english_defaults")}
     matched_ui: set[str] = set()
@@ -123,7 +123,7 @@ def main() -> int:
 
     # The app currently builds most strings directly in Java, but cover future
     # resources too. XML replacements must preserve valid escaped XML.
-    for path in sorted(root.glob("res/values*/*.xml")):
+    for path in sorted(root.glob("res/**/*.xml")):
         old = path.read_text(encoding="utf-8")
         updated = old
         for source, target in sorted(ui.items(), key=lambda kv: -len(kv[0])):
@@ -135,6 +135,27 @@ def main() -> int:
             ET.fromstring(updated)
             path.write_text(updated, encoding="utf-8")
             stats["xml_files"] += 1
+
+    # Also cover app-owned text assets (layout presets / embedded help/config).
+    for path in sorted((root / "assets").rglob("*")) if (root / "assets").is_dir() else []:
+        if not path.is_file() or path.suffix.lower() not in {
+            ".txt", ".json", ".xml", ".html", ".htm", ".properties", ".md"
+        }:
+            continue
+        try:
+            old = path.read_text(encoding="utf-8")
+        except (UnicodeError, OSError):
+            continue
+        updated = old
+        for source, target in sorted(ui.items(), key=lambda kv: -len(kv[0])):
+            if source in updated:
+                updated = updated.replace(source, target)
+                matched_ui.add(source)
+        if updated != old:
+            if path.suffix.lower() == ".json":
+                json.loads(updated)
+            path.write_text(updated, encoding="utf-8")
+            stats["asset_files"] += 1
 
     # Restrict ELF rewriting to the application's own shared libraries.
     for path in sorted(root.glob("lib/**/libnfsu2*.so")):
