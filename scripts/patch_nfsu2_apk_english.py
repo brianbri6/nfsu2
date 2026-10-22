@@ -83,7 +83,7 @@ def patch_smali(contents: str, filename: str, translations: dict[str, str],
 
 
 def patch_native(source: bytes, translations: dict[str, str], matched: set[str]) -> tuple[bytes, int]:
-    """Shorter ELF literals get a NUL terminator, never trailing spaces."""
+    """Fixed-size ELF replacements preserve embedded JSON and larger strings."""
     hits = 0
     output = source
     for old, new in sorted(translations.items(), key=lambda kv: -len(kv[0])):
@@ -93,8 +93,8 @@ def patch_native(source: bytes, translations: dict[str, str], matched: set[str])
             raise ValueError(f"native replacement is longer than source: {old!r}")
         count = output.count(encoded)
         if count:
-            # Include an explicit NUL after any shortened string; preserve offsets.
-            padding = b"\x00" * (len(encoded) - len(replacement))
+            # Use trailing spaces; an embedded NUL could truncate a JSON payload.
+            padding = b" " * (len(encoded) - len(replacement))
             output = output.replace(encoded, replacement + padding)
             hits += count
             matched.add(old)
