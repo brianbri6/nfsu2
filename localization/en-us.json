@@ -185,5 +185,8 @@
   "日本語": "Japanese",
   "한국어": "Korean",
   "繁體中文": "Chinese (Traditional)",
-  "ไทย": "Thai"
+  "ไทย": "Thai",
+  "La prueba se cerró o fue cancelada.": "The test ended or was canceled.",
+  "La prueba del driver excedió 20 segundos": "Driver test exceeded 20 seconds",
+  "No se pudo ejecutar la prueba: ": "Could not run test: "
 }
