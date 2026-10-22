@@ -1,101 +1,181 @@
 #!/usr/bin/env python3
-"""Patch user-facing Android UI strings in a prebuilt NFSU2 APK via apktool smali.
+"""Patch an upstream NFSU2 APK decoded by apktool, without recompiling native code.
 
-This script never builds or replaces the native game binaries. The APK is unpacked
-with apktool -r, only literal strings in .smali files are translated, and apktool
-reassembles the package. Verify and sign the output before distribution.
+Three surfaces are covered: smali/DEX strings, Android XML resources, and
+length-limited ELF strings. Existing Spanish language preferences are retired
+once, while the launcher language picker and native "language" option survive.
+The post-patch audit is mandatory; unknown Spanish prompts stop the release.
 """
+from __future__ import annotations
+
 import argparse
 import json
 from pathlib import Path
 import re
 import sys
 
-CONST_STRING = re.compile(r'(?m)^(?P<prefix>\s*const-string(?:/jumbo)?\s+[vp]\d+,\s*")(?P<value>(?:\\.|[^"\\])*)(?P<suffix>")')
-GAME_LANGUAGE_METHOD = re.compile(
-    r'(?ms)(\.method[^\n]*\blanguage\(Landroid/content/Context;\)Ljava/lang/String;.*?)(\.end method)'
+CONST = re.compile(
+    r'(?m)^(?P<start>\s*const-string(?:/jumbo)?\s+[vp]\d+,\s*")'
+    r'(?P<value>(?:\\.|[^"\\])*)(?P<end>")'
 )
+METHOD = re.compile(r"(?ms)^\.method[^\n]*\n.*?^\.end method[^\n]*$", re.MULTILINE)
+LANGUAGE_KEY = "language_english_v01411"
 UPSTREAM = "codepdbh/nfsu2-recompiled"
 FORK = "brianbri6/nfsu2"
 
 
-def main():
+def patch_smali(contents: str, filename: str, translations: dict[str, str],
+                stats: dict[str, int], matched: set[str]) -> str:
+    """Only modify string instructions, not class/method signatures."""
+    ordered = sorted(translations.items(), key=lambda kv: -len(kv[0]))
+
+    def translate(m: re.Match[str]) -> str:
+        old = m.group("value")
+        new = old.replace(UPSTREAM, FORK)
+        for source, target in ordered:
+            if source in new:
+                new = new.replace(source, target)
+                matched.add(source)
+        if old != new:
+            stats["smali_strings"] += 1
+        return m.group("start") + new + m.group("end")
+
+    contents = CONST.sub(translate, contents)
+    if filename == "GameOptions.smali":
+        # The .field constant may be emitted independently of its inlined uses.
+        contents, n = re.subn(
+            r'(?m)(^\.field[^\n]*\bLANGUAGE:Ljava/lang/String;\s*=\s*)"language"',
+            lambda m: m.group(1) + '"' + LANGUAGE_KEY + '"', contents
+        )
+        stats["preference_fields"] += n
+
+    if filename in {"GameOptions.smali", "LauncherActivity.smali"}:
+        def migrate(m: re.Match[str]) -> str:
+            method = m.group()
+            header = method.split("\n", 1)[0]
+            if filename == "GameOptions.smali" and re.search(r"\blanguage\(Landroid/content/Context;\)", header):
+                method, n = re.subn(
+                    r'(?m)(^\s*const-string(?:/jumbo)?\s+[vp]\d+,\s+)"Spanish"',
+                    lambda x: x.group(1) + '"English UK"', method
+                )
+                stats["english_defaults"] += n
+                method, n = re.subn(
+                    r'(?m)(^\s*const-string(?:/jumbo)?\s+[vp]\d+,\s+)"language"',
+                    lambda x: x.group(1) + '"' + LANGUAGE_KEY + '"', method
+                )
+                stats["preference_getters"] += n
+            if filename == "LauncherActivity.smali" and "chooseLanguage(" in header:
+                method, n = re.subn(
+                    r'(?m)(^\s*const-string(?:/jumbo)?\s+[vp]\d+,\s+)"language"',
+                    lambda x: x.group(1) + '"' + LANGUAGE_KEY + '"', method
+                )
+                stats["preference_setters"] += n
+            return method
+        contents = METHOD.sub(migrate, contents)
+    return contents
+
+
+def patch_native(source: bytes, translations: dict[str, str], matched: set[str]) -> tuple[bytes, int]:
+    """Shorter ELF literals get a NUL terminator, never trailing spaces."""
+    hits = 0
+    output = source
+    for old, new in sorted(translations.items(), key=lambda kv: -len(kv[0])):
+        encoded = old.encode("utf-8")
+        replacement = new.encode("utf-8")
+        if len(replacement) > len(encoded):
+            raise ValueError(f"native replacement is longer than source: {old!r}")
+        count = output.count(encoded)
+        if count:
+            # Include an explicit NUL after any shortened string; preserve offsets.
+            padding = b"\x00" * (len(encoded) - len(replacement))
+            output = output.replace(encoded, replacement + padding)
+            hits += count
+            matched.add(old)
+    if len(source) != len(output):
+        raise AssertionError("native library changed size")
+    return output, hits
+
+
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("decoded_apk", type=Path)
     parser.add_argument("--translations", type=Path, default=Path("localization/en-us.json"))
+    parser.add_argument("--native-translations", type=Path, default=Path("localization/native-en-us.json"))
+    parser.add_argument("--audit-report", type=Path, default=None)
     args = parser.parse_args()
-    translations = json.loads(args.translations.read_text(encoding="utf-8"))
-    ordered = sorted(translations.items(), key=lambda pair: len(pair[0]), reverse=True)
-    changed, matches, language_defaults, matched_keys = 0, 0, 0, set()
+    root = args.decoded_apk
+    if not root.is_dir() or not list(root.glob("smali*/**/*.smali")):
+        parser.error("Provide a full apktool-decoded APK with smali directories")
+    ui = json.loads(args.translations.read_text(encoding="utf-8"))
+    native = json.loads(args.native_translations.read_text(encoding="utf-8"))
+    stats = {k: 0 for k in (
+        "smali_files", "smali_strings", "xml_files", "native_files",
+        "native_strings", "preference_fields", "preference_getters",
+        "preference_setters", "english_defaults")}
+    matched_ui: set[str] = set()
+    matched_native: set[str] = set()
+    for path in sorted(root.glob("smali*/**/*.smali")):
+        before = path.read_text(encoding="utf-8")
+        after = patch_smali(before, path.name, ui, stats, matched_ui)
+        if before != after:
+            path.write_text(after, encoding="utf-8")
+            stats["smali_files"] += 1
 
-    for smali in args.decoded_apk.glob("smali*/**/*.smali"):
-        original = smali.read_text(encoding="utf-8")
-        def translate(m):
-            nonlocal matches
-            value = m.group("value")
-            replacement = value.replace(UPSTREAM, FORK)
-            for source, target in ordered:
-                if source in replacement:
-                    replacement = replacement.replace(source, target)
-                    matched_keys.add(source)
-            if replacement != value:
-                matches += 1
-            return m.group("prefix") + replacement + m.group("suffix")
-        updated = CONST_STRING.sub(translate, original)
-        if smali.name == "GameOptions.smali":
-            def set_default(method):
-                nonlocal language_defaults
-                first, last = method.group(1), method.group(2)
-                new, n = re.subn(
-                    r'(?m)(^\s*const-string(?:/jumbo)?\s+[vp]\d+,\s+)"Spanish"',
-                    r'\1"English UK"', first
-                )
-                language_defaults += n
-                return new + last
-            updated = GAME_LANGUAGE_METHOD.sub(set_default, updated)
-        if updated != original:
-            smali.write_text(updated, encoding="utf-8")
-            changed += 1
+    # The app currently builds most strings directly in Java, but cover future
+    # resources too. XML replacements must preserve valid escaped XML.
+    for path in sorted(root.glob("res/values*/*.xml")):
+        old = path.read_text(encoding="utf-8")
+        updated = old
+        for source, target in sorted(ui.items(), key=lambda kv: -len(kv[0])):
+            if source in updated:
+                updated = updated.replace(source, target)
+                matched_ui.add(source)
+        if updated != old:
+            import xml.etree.ElementTree as ET
+            ET.fromstring(updated)
+            path.write_text(updated, encoding="utf-8")
+            stats["xml_files"] += 1
 
+    # Restrict ELF rewriting to the application's own shared libraries.
+    for path in sorted(root.glob("lib/**/libnfsu2*.so")):
+        old = path.read_bytes()
+        updated, n = patch_native(old, native, matched_native)
+        if updated != old:
+            path.write_bytes(updated)
+            stats["native_files"] += 1
+        stats["native_strings"] += n
 
-    # Selected messages are emitted by the native launcher/Vulkan diagnostic libraries.
-    # In-place byte replacement preserves ELF offsets and never touches game code.
-    native_translations = [
-        ("No se pudo abrir el driver seleccionado", "Could not open selected driver"),
-        ("No se encontró una GPU Vulkan", "No Vulkan GPU was found"),
-        ("No se pudo cargar el driver Vulkan ", "Could not load Vulkan driver "),
-        (". Elige el driver del sistema en el launcher.", ". Select the system driver in the launcher."),
-        ("Datos accesibles: memoria interna/nfsu2\nVulkan 1.1: presentación activa\n",
-         "Game files: internal storage/nfsu2\nVulkan 1.1: active display\n"),
-    ]
-    native_files_changed = 0
-    native_messages_changed = 0
-    for library in args.decoded_apk.glob("lib/**/*.so"):
-        data = library.read_bytes()
-        updated = data
-        for source, target in native_translations:
-            src, dst = source.encode("utf-8"), target.encode("utf-8")
-            assert len(dst) <= len(src), "Native replacement exceeds original length"
-            count = updated.count(src)
-            if count:
-                updated = updated.replace(src, dst + b" " * (len(src) - len(dst)))
-                native_messages_changed += count
-        if updated != data:
-            library.write_bytes(updated)
-            native_files_changed += 1
-
-    print(json.dumps({
-        "smali_files_changed": changed,
-        "native_files_changed": native_files_changed,
-        "native_messages_changed": native_messages_changed,
-        "translated_const_strings": matches,
-        "translation_keys_matched": len(matched_keys),
-        "game_language_defaults_changed": language_defaults,
-        "unmatched_translations": sorted(set(translations) - matched_keys)
-    }, ensure_ascii=False, indent=2))
-    if changed < 5 or matches < 50 or language_defaults != 1:
-        sys.exit("ERROR: APK localization patch incomplete; upstream APK layout/version may have changed.")
+    # Mandatory audit (both source-like and ELF byte strings).
+    from audit_nfsu2_apk_english import audit
+    findings = audit(root)
+    report = {
+        **stats,
+        "ui_translation_keys_matched": len(matched_ui),
+        "native_translation_keys_matched": len(matched_native),
+        "unmatched_ui_keys": sorted(set(ui) - matched_ui),
+        "unmatched_native_keys": sorted(set(native) - matched_native),
+        "untranslated_spanish": findings,
+    }
+    message = json.dumps(report, indent=2, ensure_ascii=False)
+    print(message)
+    if args.audit_report:
+        args.audit_report.parent.mkdir(parents=True, exist_ok=True)
+        args.audit_report.write_text(message + "\n", encoding="utf-8")
+    problems = []
+    if stats["smali_files"] < 5 or stats["smali_strings"] < 50:
+        problems.append("Too few strings patched; upstream APK may have changed")
+    if stats["english_defaults"] != 1:
+        problems.append("GameOptions English default was not patched exactly once")
+    if not stats["preference_getters"] or not stats["preference_setters"]:
+        problems.append("Old saved Spanish language preference still in use")
+    if findings:
+        problems.append("Spanish app-owned strings remain (see audit report)")
+    if problems:
+        for p in problems:
+            print("ERROR:", p, file=sys.stderr)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
