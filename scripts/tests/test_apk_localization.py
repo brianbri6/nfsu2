@@ -86,11 +86,17 @@ class EnglishPatchTests(unittest.TestCase):
             x = root / "res/values/strings.xml"
             x.parent.mkdir(parents=True)
             x.write_text('<resources><string name="action">No se pudo cargar el juego</string></resources>')
+            layout = root / "res/layout/prompt.xml"
+            layout.parent.mkdir(parents=True)
+            layout.write_text('<TextView xmlns:android="http://schemas.android.com/apk/res/android" android:text="Guardar"/>')
+            asset = root / "assets/help.txt"
+            asset.parent.mkdir(parents=True)
+            asset.write_text("Pulsa JUGAR para continuar", encoding="utf-8")
             n = root / "lib/arm64-v8a/libnfsu2_android.so"
             n.parent.mkdir(parents=True)
             n.write_bytes(b'\x7fELF\x00Driver con funciones Vulkan incompletas\x00')
             findings = audit(root)
-            self.assertEqual({f["surface"] for f in findings}, {"smali", "xml", "native"})
+            self.assertEqual({f["surface"] for f in findings}, {"smali", "xml", "asset", "native"})
 
     def test_existing_source_no_spanish_prompts(self):
         java = ROOT / "android/app/src/main/java/com/nfsu2/androidevolved"
@@ -105,6 +111,10 @@ class EnglishPatchTests(unittest.TestCase):
                 if suspect(literal):
                     found.append(f"{path.name}:{content.count(chr(10), 0, match.start())+1} {literal[:100]}")
         self.assertEqual(found, [], "\n".join(found))
+
+    def test_unicode_escaped_spanish_is_detected(self):
+        self.assertTrue(suspect(r"Configuraci\u00f3n"))
+        self.assertFalse(suspect("GPU driver initialization failed"))
 
     def test_native_replacements_are_byte_length_safe(self):
         pairs = json.loads((ROOT / "localization/native-en-us.json").read_text())
