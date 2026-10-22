@@ -31,7 +31,14 @@ def patch_smali(contents: str, filename: str, translations: dict[str, str],
 
     def translate(m: re.Match[str]) -> str:
         old = m.group("value")
-        new = old.replace(UPSTREAM, FORK)
+        # apktool encodes every non-ASCII character in smali as \\uXXXX.
+        # Source dictionaries contain literal UTF-8 characters. Normalize only
+        # Unicode escapes, preserving smali's \\n and escaped quote syntax.
+        normalized = re.sub(
+            r"\\\\u([0-9a-fA-F]{4})",
+            lambda x: chr(int(x.group(1), 16)), old
+        )
+        new = normalized.replace(UPSTREAM, FORK)
         for source, target in ordered:
             if source in new:
                 new = new.replace(source, target)
