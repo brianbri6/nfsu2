@@ -188,5 +188,12 @@
   "ไทย": "Thai",
   "La prueba se cerró o fue cancelada.": "The test ended or was canceled.",
   "La prueba del driver excedió 20 segundos": "Driver test exceeded 20 seconds",
-  "No se pudo ejecutar la prueba: ": "Could not run test: "
+  "No se pudo ejecutar la prueba: ": "Could not run test: ",
+  "Controles del juego": "Game controls",
+  "El paquete no ofrece vkGetInstanceProcAddr": "Package does not provide vkGetInstanceProcAddr",
+  "El paquete no ofrece vkCreateInstance": "Package does not provide vkCreateInstance",
+  "Driver con funciones Vulkan incompletas": "Driver is missing required Vulkan functions",
+  "La GPU no pudo crear el dispositivo grafico (Vulkan, CreateDevice ": "The GPU could not create a graphics device (Vulkan, CreateDevice ",
+  "HLE pendiente: ": "Unimplemented HLE: ",
+  "Texturas comprimidas: convertir en CPU": "Compressed textures: convert on CPU"
 }
