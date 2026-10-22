@@ -27,6 +27,7 @@ SPANISH = re.compile(
     r"comprobando|cargando novedades|falta[n]? carpetas|"
     r"falta[n]? funciones|archivos del juego|pantalla panor[aá]mica|"
     r"escribe un nombre|guardar layout|el modo online|"
+    r"ejecutando entrada|entrada crt del juego|"
     r"se aplican|se conecta|control de inclinaci[oó]n|"
     r"conducci[oó]n por inclinaci[oó]n)\b|[¿¡])",
     re.IGNORECASE,
@@ -98,7 +99,10 @@ def audit(root: Path) -> list[dict[str, str | int]]:
         seen: set[str] = set()
         for m in NATIVE_STRINGS.finditer(binary):
             value = m.group().decode("utf-8", errors="ignore")
-            if value in seen or not suspect(value):
+            # Machine instructions can contain arbitrary non-ASCII bytes that
+            # look like accents. Only report recognizable multiword Spanish
+            # phrases from native binaries, never isolated accented bytes.
+            if value in seen or not SPANISH.search(value):
                 continue
             seen.add(value)
             findings.append({"surface": "native", "file": str(path.relative_to(root)),
