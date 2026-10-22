@@ -25,6 +25,8 @@ jobs:
           set -euo pipefail
           curl -fL --retry 3 -o apktool.jar https://github.com/iBotPeaches/Apktool/releases/download/v2.12.1/apktool_2.12.1.jar
           java -jar apktool.jar --version
+          python3 -m py_compile scripts/patch_nfsu2_apk_english.py
+          python3 -m json.tool localization/en-us.json >/dev/null
       - name: Prepare APK signing key
         shell: bash
         env:
@@ -61,7 +63,7 @@ jobs:
             curl -fL --retry 3 -o "$filename" "https://github.com/codepdbh/nfsu2-recompiled/releases/download/v$UPSTREAM_VERSION/$filename"
             test "$(stat -c%s "$filename")" -gt 1000000
             sha256sum "$filename"
-            java -jar apktool.jar d -f -r "$filename" -o "decoded-$abi"
+            java -jar apktool.jar d -f "$filename" -o "decoded-$abi"
             python3 scripts/patch_nfsu2_apk_english.py "decoded-$abi" --translations localization/en-us.json
             python3 - "decoded-$abi/apktool.yml" <<'PY'
           import pathlib, re, sys
