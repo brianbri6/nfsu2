@@ -283,7 +283,7 @@ uint32_t allocate(uint32_t bytes) {
 }
 void unsupported() {
     uint32_t index = (lastImport-importBase)/16;
-    throw GuestStop("HLE pendiente: " + imports.at(index).name + " desde " + hex(g_cur_func));
+    throw GuestStop("Unimplemented HLE: " + imports.at(index).name + " at " + hex(g_cur_func));
 }
 void getVersion() {
     uint32_t out = arg(0), bytes=read32(out);
