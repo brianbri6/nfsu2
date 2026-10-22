@@ -21,7 +21,7 @@ final class GameOptions {
     }
 
     static final String RESOLUTION = "resolution", FPS = "fps", WIDESCREEN = "widescreen", LATENCY = "latency",
-            TEXTURES = "textures", MINIMAP = "minimap", LANGUAGE = "language";
+            TEXTURES = "textures", MINIMAP = "minimap", LANGUAGE = "language_english_v01411";
 
     static final Option[] ALL = {
             new Option(RESOLUTION, "Internal resolution", "75",
@@ -81,7 +81,11 @@ final class GameOptions {
         return value != null && value.length() <= 253 && value.matches("[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*");
     }
 
-    /** The game's language folder name (LANGUAGES/<file>.bin) chosen in the launcher. */
+    /**
+     * Use a new preference key for the English localization release. This intentionally
+     * ignores a previously stored Spanish default while allowing the user to select
+     * and save any game language again from the launcher.
+     */
     static String language(Context context) {
         return prefs(context).getString(LANGUAGE, "English UK");
     }
