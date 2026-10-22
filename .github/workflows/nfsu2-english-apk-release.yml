@@ -10,6 +10,9 @@ on:
       - 'scripts/audit_nfsu2_apk_english.py'
       - 'scripts/tests/**'
       - 'localization/**'
+concurrency:
+  group: nfsu2-english-apk-release
+  cancel-in-progress: true
 permissions:
   contents: write
 jobs:
@@ -73,6 +76,8 @@ jobs:
             test "$(stat -c%s "$filename")" -gt 1000000
             sha256sum "$filename"
             java -jar apktool.jar d -f "$filename" -o "decoded-$abi"
+            # Baseline audit is expected to detect Spanish in the unmodified APK.
+            python3 scripts/audit_nfsu2_apk_english.py "decoded-$abi" --report "output/before-$abi.json" || true
             python3 scripts/patch_nfsu2_apk_english.py "decoded-$abi"               --translations localization/en-us.json               --native-translations localization/native-en-us.json               --audit-report "output/audit-$abi.json"
             python3 scripts/audit_nfsu2_apk_english.py "decoded-$abi" --report "output/verified-$abi.json"
             python3 - "decoded-$abi/apktool.yml" <<'PY'
@@ -90,6 +95,8 @@ jobs:
             "$BUILD_TOOLS/apksigner" sign --ks nfsu2-signing.jks --ks-pass "pass:$STORE_PASSWORD" \
               --ks-key-alias "$KEY_ALIAS" --key-pass "pass:$KEY_PASSWORD" --out "$outfile" "output/aligned-$abi.apk"
             "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$outfile"
+            "$BUILD_TOOLS/zipalign" -c -P 16 -v 4 "$outfile"
+            "$BUILD_TOOLS/aapt" dump badging "$outfile" | head -n 5
             sha256sum "$outfile"
           done
           (cd output && sha256sum NFSU2-AndroidEvolved-*-English-*.apk > SHA256SUMS.txt)
@@ -99,6 +106,7 @@ jobs:
         with:
           name: nfsu2-english-localization-audits
           path: |
+            output/before-*.json
             output/audit-*.json
             output/verified-*.json
           if-no-files-found: warn
@@ -118,8 +126,8 @@ jobs:
           Includes ARM64 and 32-bit ARM APKs. Original source APKs: https://github.com/codepdbh/nfsu2-recompiled/releases/tag/v0.14.9
           EOF
           if gh release view "v$VERSION" >/dev/null 2>&1; then
-            gh release upload "v$VERSION" output/NFSU2-AndroidEvolved-*-English-*.apk output/SHA256SUMS.txt output/audit-*.json --clobber
+            gh release upload "v$VERSION" output/NFSU2-AndroidEvolved-*-English-*.apk output/SHA256SUMS.txt output/before-*.json output/audit-*.json output/verified-*.json --clobber
           else
-            gh release create "v$VERSION" output/NFSU2-AndroidEvolved-*-English-*.apk output/SHA256SUMS.txt output/audit-*.json \
+            gh release create "v$VERSION" output/NFSU2-AndroidEvolved-*-English-*.apk output/SHA256SUMS.txt output/before-*.json output/audit-*.json output/verified-*.json \
               --title "NFSU2 Android Evolved v$VERSION - English" --notes-file release-notes.md --target "$GITHUB_SHA" --latest
           fi
