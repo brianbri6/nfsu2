@@ -48,8 +48,8 @@ def suspect(s: str) -> bool:
     # Accents in non-English Latin strings usually indicate untranslated UI.
     # Avoid matching French/Danish/Japanese labels left in language identifiers.
     if ACCENTED_SPANISH.search(s) and not (
-        re.fullmatch(r"(?:LANGUAGES/)?[\w./-]*", s)
-        or "français" in s.casefold()
+        s.startswith("LANGUAGES/")
+        or s.casefold() in {"français", "nederlands", "español", "italiano"} 
     ):
         return True
     return False
