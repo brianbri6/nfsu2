@@ -104,7 +104,7 @@ final class Diagnostics {
 
     // Lines that explain a stop, a stall or a missing piece of the Windows layer.
     private static final java.util.regex.Pattern KEY_LINE = java.util.regex.Pattern.compile(
-            "stopped|boundary|pendiente|unresolved|stall|  thread |FATAL|Fatal|SIGSEGV|SIGBUS|abort|DeadSystem|E DXVK|MessageBox"
+            "stopped|boundary|HLE missing|pendiente|unresolved|stall|  thread |FATAL|Fatal|SIGSEGV|SIGBUS|abort|DeadSystem|E DXVK|MessageBox"
             // Native crash frames inside our libraries (symbolized later with symbols-vX.Y.Z).
             + "|#[01][0-9] pc [0-9a-f]+ .*libnfsu2");
     // Per-frame or per-file chatter that crowds out the useful part of the tail.
@@ -166,7 +166,7 @@ final class Diagnostics {
             resolver.delete(target, null, null);
             throw error;
         }
-        return "Descargas/NFSU2/" + report.getName();
+        return "Downloads/NFSU2/" + report.getName();
     }
 
     private static void add(ZipOutputStream zip, String name, byte[] data) throws IOException {
