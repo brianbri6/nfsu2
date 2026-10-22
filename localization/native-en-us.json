@@ -1,0 +1,16 @@
+{
+  "No se pudo abrir el driver seleccionado": "Could not open selected driver",
+  "No se encontró una GPU Vulkan": "No Vulkan GPU was found",
+  "No se pudo cargar el driver Vulkan ": "Could not load Vulkan driver ",
+  ". Elige el driver del sistema en el launcher.": ". Select system driver in launcher.",
+  "Datos accesibles: memoria interna/nfsu2\nVulkan 1.1: presentación activa\n": "Game files: internal storage/nfsu2\nVulkan 1.1: active display\n",
+  "El paquete no ofrece vkGetInstanceProcAddr": "Missing vkGetInstanceProcAddr",
+  "El paquete no ofrece vkCreateInstance": "Missing vkCreateInstance",
+  "Driver con funciones Vulkan incompletas": "Missing required Vulkan functions",
+  "HLE pendiente: ": "HLE missing: ",
+  " desde ": " at ",
+  "Sincronía CPU/GPU": "CPU/GPU sync",
+  "Texturas comprimidas: convertir en CPU": "Compressed textures: CPU conversion",
+  "La GPU no pudo crear el dispositivo grafico (Vulkan, CreateDevice ": "GPU graphics device failed (Vulkan, CreateDevice ",
+  "). Usa \\\"Probar driver\\\" en el launcher para ver que le falta.": "). Use \\\"Test driver\\\" in the launcher for details."
+}
