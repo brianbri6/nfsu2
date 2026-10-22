@@ -14,7 +14,7 @@ import re
 from xml.etree import ElementTree
 
 SMALI_STRINGS = re.compile(r'(?m)^\s*const-string(?:/jumbo)?\s+[vp]\d+,\s*"((?:\\.|[^"\\])*)"')
-NATIVE_STRINGS = re.compile(rb"[\x20-\x7e\xc0-\xff]{8,}")
+NATIVE_STRINGS = re.compile(rb"[\x20-\x7e\x80-\xff]{8,}")
 # Multiword markers minimize false positives from English technical logs.
 SPANISH = re.compile(
     r"(?:\b(?:no se|se pudo|no hay|se cerr[oó]|se guard[oó]|"
